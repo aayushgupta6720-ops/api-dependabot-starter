@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "eval": "tsx src/eval/run.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",
