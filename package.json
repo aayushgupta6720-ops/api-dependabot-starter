@@ -1,0 +1,25 @@
+{
+  "name": "api-dependabot",
+  "version": "0.1.0",
+  "description": "Agent that detects SDK breaking changes and opens fixing PRs",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0",
+    "ts-morph": "^23.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.7.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  }
+}

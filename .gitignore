@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.DS_Store
+.changelog-state.json
+
+# local checkout of the SDK-consuming repo being scanned; it's its own git repo
+target-repo/
