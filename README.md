@@ -41,10 +41,11 @@ straight through `generatePatch`, checks the output against each fixture's
 `mustContain`/`mustNotContain` substrings, and writes full results
 (explanations + patched code, not just pass/fail) to `eval-results/`.
 
-The bundled fixtures are 5 real, well-known Stripe API migrations — just
-enough to prove the harness works. Replace/extend them with 10-15 real
-historical breaking changes for whatever SDK `TARGET_PACKAGE_REPO` actually
-points at.
+The bundled fixtures are 10 real breaking changes pulled straight from
+[stripe-node's own CHANGELOG](https://github.com/stripe/stripe-node/blob/master/CHANGELOG.md)
+(v6.21.0 through v22.0.0), each citing the release it shipped in. If you
+point `TARGET_PACKAGE_REPO` at a different SDK, swap these out for that
+SDK's own history the same way.
 
 ## What's stubbed vs. real
 
@@ -56,8 +57,7 @@ points at.
 | Changelog watcher | Working — polls GitHub Releases, extracts breaking changes via Gemini |
 | Eval harness | Working — replays fixtures through the patch generator, grades pass/fail |
 
-## Next steps (in order)
+## Next steps
 
-1. **Fill out the eval set**: swap in 10-15 real historical breaking changes
-   for your target SDK instead of the 5 starter fixtures.
-2. Only then consider the dashboard — it's not needed to prove the idea works.
+Only remaining item is the dashboard — it's not needed to prove the idea
+works, so it's deliberately last.
