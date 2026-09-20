@@ -50,7 +50,7 @@ points at.
 
 | Piece | Status |
 |---|---|
-| Usage scanner (AST-based) | Working — flags call sites by method name |
+| Usage scanner (AST-based) | Working — resolves call sites back to a client built from the tracked package, not just text matching |
 | LLM patch generation (Gemini) | Working |
 | GitHub PR creation | Working |
 | Changelog watcher | Working — polls GitHub Releases, extracts breaking changes via Gemini |
@@ -58,9 +58,6 @@ points at.
 
 ## Next steps (in order)
 
-1. **Tighten the scanner**: the current match is "call expression text
-   contains the method name" — this will false-positive on comments and
-   unrelated methods with similar names. Add proper call-target resolution.
-2. **Fill out the eval set**: swap in 10-15 real historical breaking changes
+1. **Fill out the eval set**: swap in 10-15 real historical breaking changes
    for your target SDK instead of the 5 starter fixtures.
-3. Only then consider the dashboard — it's not needed to prove the idea works.
+2. Only then consider the dashboard — it's not needed to prove the idea works.
