@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>api-dependabot dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.4;
+  }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: 0.3rem; }
+  .status-strip {
+    display: flex;
+    gap: 2rem;
+    padding: 0.75rem 1rem;
+    background: #8881;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  .status-strip div span { display: block; font-size: 0.75rem; opacity: 0.7; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #8883; vertical-align: top; }
+  .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; margin: 0.1rem 0.2rem 0.1rem 0; }
+  .badge-ok { background: #1a7f3722; color: #1a7f37; }
+  .badge-skip { background: #6e768122; color: #6e7681; }
+  .badge-error { background: #cf222e22; color: #cf222e; }
+  .empty { opacity: 0.6; font-style: italic; padding: 1rem 0; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+  <h1>api-dependabot dashboard</h1>
+
+  <div class="status-strip" id="status">Loading...</div>
+
+  <h2>Runs</h2>
+  <div id="runs" class="empty">Loading...</div>
+
+  <h2>Eval history</h2>
+  <div id="evals" class="empty">Loading...</div>
+
+<script>
+  function fmtTime(iso) {
+    if (!iso) return "never";
+    return new Date(iso).toLocaleString();
+  }
+
+  function badge(patch) {
+    if (patch.status === "pr_opened") {
+      return `<a class="badge badge-ok" href="${patch.prUrl}" target="_blank">${patch.filePath}: PR opened</a>`;
+    }
+    if (patch.status === "no_change_needed") {
+      return `<span class="badge badge-skip">${patch.filePath}: no change needed</span>`;
+    }
+    return `<span class="badge badge-error" title="${patch.error ?? ""}">${patch.filePath}: error</span>`;
+  }
+
+  async function loadStatus() {
+    const s = await fetch("/api/status").then((r) => r.json());
+    document.getElementById("status").innerHTML = `
+      <div><span>Last run</span>${fmtTime(s.lastRunAt)}</div>
+      <div><span>Last seen release</span>${s.lastSeenTag ?? "none yet"}</div>
+    `;
+  }
+
+  async function loadRuns() {
+    const runs = await fetch("/api/runs").then((r) => r.json());
+    const el = document.getElementById("runs");
+    if (runs.length === 0) {
+      el.innerHTML = '<div class="empty">No runs logged yet — run `npm run dev`.</div>';
+      return;
+    }
+    el.className = "";
+    el.innerHTML = `<table>
+      <thead><tr><th>When</th><th>Changes found</th><th>Result</th></tr></thead>
+      <tbody>
+        ${runs.map((run) => `
+          <tr>
+            <td>${fmtTime(run.startedAt)}${run.error ? `<br><span class="badge badge-error">run error: ${run.error}</span>` : ""}</td>
+            <td>${run.changesFound}</td>
+            <td>
+              ${run.changes.map((c) => `
+                <div>
+                  <strong>${c.version}</strong> — ${c.methodName} (${c.usagesFound} usage${c.usagesFound === 1 ? "" : "s"})
+                  ${c.error ? `<div class="badge badge-error">${c.error}</div>` : ""}
+                  <div>${c.patches.map(badge).join(" ")}</div>
+                </div>
+              `).join("")}
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
+  }
+
+  async function loadEvals() {
+    const evals = await fetch("/api/evals").then((r) => r.json());
+    const el = document.getElementById("evals");
+    if (evals.length === 0) {
+      el.innerHTML = '<div class="empty">No eval runs yet — run `npm run eval`.</div>';
+      return;
+    }
+    el.className = "";
+    el.innerHTML = `<table>
+      <thead><tr><th>Run</th><th>Result</th></tr></thead>
+      <tbody>
+        ${evals.map((e) => `
+          <tr>
+            <td>${e.timestamp}</td>
+            <td><span class="badge ${e.passed === e.total ? "badge-ok" : "badge-error"}">${e.passed}/${e.total} passed</span></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
+  }
+
+  loadStatus();
+  loadRuns();
+  loadEvals();
+</script>
+</body>
+</html>
