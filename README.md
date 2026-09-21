@@ -11,6 +11,10 @@ through the patch generator to catch regressions in output quality, and
 fault-tolerant run logging that isolates failures per-item so one bad
 patch or PR doesn't abort the rest of a run.
 
+**Stack:** TypeScript, Node.js, LLM integration (Gemini), prompt
+engineering, AST analysis (ts-morph), GitHub API/Octokit, agentic
+pipeline design, eval harness design
+
 ## Setup
 
 ```bash
