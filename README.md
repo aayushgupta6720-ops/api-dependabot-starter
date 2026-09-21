@@ -1,6 +1,15 @@
 # api-dependabot
 
-Detects SDK breaking changes and opens a fixing PR automatically.
+A multi-step autonomous agent pipeline (detect → scan → patch → PR) that
+watches an SDK's changelog for breaking changes, resolves real usages via
+AST analysis, and uses an LLM to generate and submit fixing pull requests
+without human intervention — going beyond version-bump tools like
+Dependabot by actually patching the affected code.
+
+Includes an eval harness that replays real breaking-change fixtures
+through the patch generator to catch regressions in output quality, and
+fault-tolerant run logging that isolates failures per-item so one bad
+patch or PR doesn't abort the rest of a run.
 
 ## Setup
 
