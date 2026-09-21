@@ -47,6 +47,26 @@ The bundled fixtures are 10 real breaking changes pulled straight from
 point `TARGET_PACKAGE_REPO` at a different SDK, swap these out for that
 SDK's own history the same way.
 
+## Run logging
+
+Every `npm run dev` run appends a JSON entry to `run-log.jsonl` (gitignored,
+created on first run): changes found, usages found, and a per-file outcome
+(`pr_opened` / `no_change_needed` / `error`). A failure patching or opening
+a PR for one file is caught and recorded instead of aborting the rest of
+the run — later changes/files in the same run still get processed.
+
+## Dashboard
+
+```bash
+npm run dashboard
+```
+
+Serves a read-only view at `http://localhost:4200` (override with
+`DASHBOARD_PORT`): a feed of past runs (with PR links / error badges),
+eval pass-rate history from `eval-results/`, and watcher health (last run,
+last seen release tag from `.changelog-state.json`). No new dependencies —
+built on Node's built-in `http` server plus a static HTML/JS page.
+
 ## What's stubbed vs. real
 
 | Piece | Status |
@@ -56,8 +76,11 @@ SDK's own history the same way.
 | GitHub PR creation | Working |
 | Changelog watcher | Working — polls GitHub Releases, extracts breaking changes via Gemini |
 | Eval harness | Working — replays fixtures through the patch generator, grades pass/fail |
+| Run logging | Working — every run appends structured results to `run-log.jsonl` |
+| Dashboard | Working — read-only view of runs, evals, and watcher health |
 
 ## Next steps
 
-Only remaining item is the dashboard — it's not needed to prove the idea
-works, so it's deliberately last.
+Nothing major stubbed out. Possible follow-ups: retention/rotation for
+`run-log.jsonl` if it grows large, and auth if the dashboard is ever
+exposed beyond localhost.
