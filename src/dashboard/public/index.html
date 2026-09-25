@@ -44,84 +44,19 @@
   <h2>Eval history</h2>
   <div id="evals" class="empty">Loading...</div>
 
-<script>
-  function fmtTime(iso) {
-    if (!iso) return "never";
-    return new Date(iso).toLocaleString();
+<script type="module">
+  import { renderEvals, renderRuns, renderStatus } from "/render.js";
+
+  async function load(id, path, render) {
+    const el = document.getElementById(id);
+    const data = await fetch(path).then((r) => r.json());
+    if (Array.isArray(data)) el.className = data.length === 0 ? "empty" : "";  // the run and eval lists
+    el.innerHTML = render(data);
   }
 
-  function badge(patch) {
-    if (patch.status === "pr_opened") {
-      return `<a class="badge badge-ok" href="${patch.prUrl}" target="_blank">${patch.filePath}: PR opened</a>`;
-    }
-    if (patch.status === "no_change_needed") {
-      return `<span class="badge badge-skip">${patch.filePath}: no change needed</span>`;
-    }
-    return `<span class="badge badge-error" title="${patch.error ?? ""}">${patch.filePath}: error</span>`;
-  }
-
-  async function loadStatus() {
-    const s = await fetch("/api/status").then((r) => r.json());
-    document.getElementById("status").innerHTML = `
-      <div><span>Last run</span>${fmtTime(s.lastRunAt)}</div>
-      <div><span>Last seen release</span>${s.lastSeenTag ?? "none yet"}</div>
-    `;
-  }
-
-  async function loadRuns() {
-    const runs = await fetch("/api/runs").then((r) => r.json());
-    const el = document.getElementById("runs");
-    if (runs.length === 0) {
-      el.innerHTML = '<div class="empty">No runs logged yet — run `npm run dev`.</div>';
-      return;
-    }
-    el.className = "";
-    el.innerHTML = `<table>
-      <thead><tr><th>When</th><th>Changes found</th><th>Result</th></tr></thead>
-      <tbody>
-        ${runs.map((run) => `
-          <tr>
-            <td>${fmtTime(run.startedAt)}${run.error ? `<br><span class="badge badge-error">run error: ${run.error}</span>` : ""}</td>
-            <td>${run.changesFound}</td>
-            <td>
-              ${run.changes.map((c) => `
-                <div>
-                  <strong>${c.version}</strong> — ${c.methodName} (${c.usagesFound} usage${c.usagesFound === 1 ? "" : "s"})
-                  ${c.error ? `<div class="badge badge-error">${c.error}</div>` : ""}
-                  <div>${c.patches.map(badge).join(" ")}</div>
-                </div>
-              `).join("")}
-            </td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>`;
-  }
-
-  async function loadEvals() {
-    const evals = await fetch("/api/evals").then((r) => r.json());
-    const el = document.getElementById("evals");
-    if (evals.length === 0) {
-      el.innerHTML = '<div class="empty">No eval runs yet — run `npm run eval`.</div>';
-      return;
-    }
-    el.className = "";
-    el.innerHTML = `<table>
-      <thead><tr><th>Run</th><th>Result</th></tr></thead>
-      <tbody>
-        ${evals.map((e) => `
-          <tr>
-            <td>${e.timestamp}</td>
-            <td><span class="badge ${e.passed === e.total ? "badge-ok" : "badge-error"}">${e.passed}/${e.total} passed</span></td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>`;
-  }
-
-  loadStatus();
-  loadRuns();
-  loadEvals();
+  load("status", "/api/status", renderStatus);
+  load("runs", "/api/runs", renderRuns);
+  load("evals", "/api/evals", renderEvals);
 </script>
 </body>
 </html>

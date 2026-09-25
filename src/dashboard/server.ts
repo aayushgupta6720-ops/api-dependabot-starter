@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,16 +7,36 @@ import type { RunLogEntry } from "../runLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
-const RUN_LOG_PATH = path.resolve("./run-log.jsonl");
-const STATE_PATH = path.resolve("./.changelog-state.json");
-const EVAL_RESULTS_DIR = path.resolve("./eval-results");
 
-const PORT = Number(process.env.DASHBOARD_PORT ?? 4200);
+export interface DashboardPaths {
+  runLog: string;
+  state: string;
+  evalResults: string;
+}
 
-function readRuns(): RunLogEntry[] {
-  if (!existsSync(RUN_LOG_PATH)) return [];
-  const lines = readFileSync(RUN_LOG_PATH, "utf8").split("\n").filter((l) => l.trim());
-  const runs = lines.map((line) => JSON.parse(line) as RunLogEntry);
+const DEFAULT_PATHS: DashboardPaths = {
+  runLog: path.resolve("./run-log.jsonl"),
+  state: path.resolve("./.changelog-state.json"),
+  evalResults: path.resolve("./eval-results"),
+};
+
+/** Parses what it can: one bad line or file (a half-written append, a hand
+ * edit) is skipped rather than failing the whole page. */
+function parseOrSkip<T>(text: string, source: string): T | undefined {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    console.warn(`Skipping unreadable JSON in ${source}`);
+    return undefined;
+  }
+}
+
+function readRuns(paths: DashboardPaths): RunLogEntry[] {
+  if (!existsSync(paths.runLog)) return [];
+  const lines = readFileSync(paths.runLog, "utf8").split("\n").filter((l) => l.trim());
+  const runs = lines
+    .map((line, i) => parseOrSkip<RunLogEntry>(line, `${paths.runLog} line ${i + 1}`))
+    .filter((run): run is RunLogEntry => run !== undefined);
   return runs.reverse(); // newest first
 }
 
@@ -33,32 +53,35 @@ interface EvalSummary {
   total: number;
 }
 
-function readEvals(): EvalSummary[] {
-  if (!existsSync(EVAL_RESULTS_DIR)) return [];
-  const files = readdirSync(EVAL_RESULTS_DIR).filter((f) => f.endsWith(".json"));
-  const summaries = files.map((file) => {
-    const results = JSON.parse(
-      readFileSync(path.join(EVAL_RESULTS_DIR, file), "utf8")
-    ) as EvalCaseResult[];
-    return {
+function readEvals(paths: DashboardPaths): EvalSummary[] {
+  if (!existsSync(paths.evalResults)) return [];
+  const files = readdirSync(paths.evalResults).filter((f) => f.endsWith(".json"));
+  const summaries: EvalSummary[] = [];
+  for (const file of files) {
+    const results = parseOrSkip<EvalCaseResult[]>(
+      readFileSync(path.join(paths.evalResults, file), "utf8"),
+      file
+    );
+    if (!Array.isArray(results)) continue;
+    summaries.push({
       file,
       // filenames are `new Date().toISOString().replace(/[:.]/g, "-")` (see src/eval/run.ts),
       // so they already sort chronologically as strings — no need to reconstruct real ISO.
       timestamp: file.replace(/\.json$/, ""),
       passed: results.filter((r) => r.pass).length,
       total: results.length,
-    };
-  });
+    });
+  }
   return summaries.sort((a, b) => b.file.localeCompare(a.file));
 }
 
-function readStatus() {
-  const state = existsSync(STATE_PATH)
-    ? JSON.parse(readFileSync(STATE_PATH, "utf8"))
-    : { lastSeenTag: null };
-  const runs = readRuns();
+function readStatus(paths: DashboardPaths) {
+  const state = existsSync(paths.state)
+    ? parseOrSkip<{ lastSeenTag: string | null }>(readFileSync(paths.state, "utf8"), paths.state)
+    : undefined;
+  const runs = readRuns(paths);
   return {
-    lastSeenTag: state.lastSeenTag,
+    lastSeenTag: state?.lastSeenTag ?? null,
     lastRunAt: runs[0]?.startedAt ?? null,
   };
 }
@@ -69,45 +92,65 @@ const CONTENT_TYPES: Record<string, string> = {
   ".js": "text/javascript",
 };
 
-const server = createServer(async (req, res) => {
-  const url = req.url ?? "/";
+export function createDashboardServer(paths: DashboardPaths = DEFAULT_PATHS): Server {
+  return createServer(async (req, res) => {
+    // An error here would otherwise reject the handler's promise, and Node
+    // exits on an unhandled rejection: one bad request took the dashboard down.
+    try {
+      // Routing on the parsed path: query strings don't break a route, and
+      // "../" segments are resolved against "/", so they can't climb above it.
+      const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
 
-  if (url === "/api/runs") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(readRuns()));
-    return;
-  }
+      if (pathname === "/api/runs") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(readRuns(paths)));
+        return;
+      }
 
-  if (url === "/api/evals") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(readEvals()));
-    return;
-  }
+      if (pathname === "/api/evals") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(readEvals(paths)));
+        return;
+      }
 
-  if (url === "/api/status") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(readStatus()));
-    return;
-  }
+      if (pathname === "/api/status") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(readStatus(paths)));
+        return;
+      }
 
-  const filePath = path.join(PUBLIC_DIR, url === "/" ? "index.html" : url);
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403);
-    res.end("Forbidden");
-    return;
-  }
+      const filePath = path.join(PUBLIC_DIR, pathname === "/" ? "index.html" : pathname);
+      // With the separator, so a sibling like "public-old" doesn't pass as inside "public".
+      if (!filePath.startsWith(PUBLIC_DIR + path.sep)) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
 
-  try {
-    const body = await readFile(filePath);
-    const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream" });
-    res.end(body);
-  } catch {
-    res.writeHead(404);
-    res.end("Not found");
-  }
-});
+      try {
+        const body = await readFile(filePath);
+        const ext = path.extname(filePath);
+        res.writeHead(200, { "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream" });
+        res.end(body);
+      } catch {
+        res.writeHead(404);
+        res.end("Not found");
+      }
+    } catch (err) {
+      console.error(err);
+      if (!res.headersSent) res.writeHead(500);
+      res.end("Internal error");
+    }
+  });
+}
 
-server.listen(PORT, () => {
-  console.log(`Dashboard running at http://localhost:${PORT}`);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  const port = Number(process.env.DASHBOARD_PORT ?? 4200);
+  // Only this machine by default: the run history (PR links, file paths,
+  // errors) isn't for everyone on the network. DASHBOARD_HOST=0.0.0.0 opens it
+  // up deliberately; there's no auth, so only do that on a network you trust.
+  const host = process.env.DASHBOARD_HOST ?? "127.0.0.1";
+  createDashboardServer().listen(port, host, () => {
+    console.log(`Dashboard running at http://${host === "127.0.0.1" ? "localhost" : host}:${port}`);
+  });
+}

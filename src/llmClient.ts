@@ -20,10 +20,11 @@ export interface ReleaseNotes {
 
 async function callGemini(prompt: string): Promise<string> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${config.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // In a header rather than ?key=, where proxies and request logs would record it.
+      headers: { "Content-Type": "application/json", "x-goog-api-key": config.geminiApiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
       }),

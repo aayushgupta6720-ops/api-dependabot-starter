@@ -57,6 +57,8 @@ requests/day each, and a single `npm run eval` uses 10.
 `npm run dev` makes no Gemini calls when there are no new releases.
 Otherwise it makes one call to extract breaking changes from all new
 releases at once, plus one per affected file for each breaking change.
+The key goes in an `x-goog-api-key` header rather than the URL, where
+proxies and request logs would record it.
 
 ## Eval harness
 
@@ -94,6 +96,23 @@ Serves a read-only view at `http://localhost:4200` (override with
 eval pass-rate history from `eval-results/`, and watcher health (last run,
 last seen release tag from `.changelog-state.json`). No new dependencies —
 built on Node's built-in `http` server plus a static HTML/JS page.
+
+It listens on `127.0.0.1` only, since the run history (PR links, file
+paths, errors) isn't for everyone on your network. `DASHBOARD_HOST=0.0.0.0`
+opens it up; there's no auth, so only do that on a network you trust.
+Everything it shows is escaped: versions and method names are the model's
+reading of someone else's release notes, and errors can quote raw model
+output, so none of it is trusted as HTML. An unreadable line in
+`run-log.jsonl` or eval file is skipped rather than taking the page down.
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs offline with Node's built-in test runner (no API keys or network): the
+dashboard's escaping and error handling, and how the Gemini key is sent.
 
 ## What's stubbed vs. real
 
