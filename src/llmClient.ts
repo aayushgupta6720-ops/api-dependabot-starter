@@ -45,7 +45,7 @@ async function callGemini(prompt: string): Promise<string> {
  * the rest of the pipeline expects (the same shape CHANGELOG_ENTRY/
  * METHOD_NAME used to be filled in by hand). Batched into a single call so
  * checking N new releases costs one request, not N — the free-tier Gemini
- * quota is a handful of requests per day.
+ * quota is a daily budget per Google project, shared with every run and eval.
  */
 export async function extractBreakingChanges(
   packageName: string,
