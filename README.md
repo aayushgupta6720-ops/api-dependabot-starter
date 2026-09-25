@@ -39,9 +39,22 @@ npm run dev
 This checks `TARGET_PACKAGE_REPO`'s GitHub releases for breaking changes
 since the last run (tracked in `.changelog-state.json`), extracts them with
 Gemini, then runs scan → generate patch → open PR for each one it finds.
+The scanner groups call sites by file, so a file that calls the changed
+method several times still gets one patch and one PR.
 
 On the very first run there's no "last seen" marker yet, so it only looks at
 the single most recent release — it won't replay the SDK's entire history.
+
+## Model and free-tier quota
+
+The model is `gemini-3.5-flash-lite`, set by `MODEL` in `src/llmClient.ts`.
+The free tier allows it 500 requests/day per Google project. The bigger
+`gemini-3.5-flash` and `gemini-3.6-flash` work too, but get only 20
+requests/day each, and a single `npm run eval` uses 10.
+
+`npm run dev` makes no Gemini calls when there are no new releases.
+Otherwise it makes one call to extract breaking changes from all new
+releases at once, plus one per affected file for each breaking change.
 
 ## Eval harness
 
@@ -63,7 +76,7 @@ SDK's own history the same way.
 ## Run logging
 
 Every `npm run dev` run appends a JSON entry to `run-log.jsonl` (gitignored,
-created on first run): changes found, usages found, and a per-file outcome
+created on first run): changes found, call sites found, and a per-file outcome
 (`pr_opened` / `no_change_needed` / `error`). A failure patching or opening
 a PR for one file is caught and recorded instead of aborting the rest of
 the run — later changes/files in the same run still get processed.
@@ -84,7 +97,7 @@ built on Node's built-in `http` server plus a static HTML/JS page.
 
 | Piece | Status |
 |---|---|
-| Usage scanner (AST-based) | Working — resolves call sites back to a client built from the tracked package, not just text matching |
+| Usage scanner (AST-based) | Working — resolves call sites back to a client built from the tracked package, not just text matching, and groups them per file |
 | LLM patch generation (Gemini) | Working |
 | GitHub PR creation | Working |
 | Changelog watcher | Working — polls GitHub Releases, extracts breaking changes via Gemini |
