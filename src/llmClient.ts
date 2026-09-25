@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 
-const MODEL = "gemini-3.6-flash"; // check https://ai.google.dev for current free-tier model names
+const MODEL = "gemini-3.5-flash-lite"; // check https://ai.google.dev for current free-tier model names
 
 export interface PatchResult {
   explanation: string;
