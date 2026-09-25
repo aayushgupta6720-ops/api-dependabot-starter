@@ -17,15 +17,17 @@ async function runCase(testCase: (typeof cases)[number]): Promise<CaseResult> {
     testCase.beforeCode
   );
 
+  const found = (check: string | RegExp) =>
+    typeof check === "string" ? patchedCode.includes(check) : check.test(patchedCode);
   const failures: string[] = [];
   for (const required of testCase.mustContain) {
-    if (!patchedCode.includes(required)) {
-      failures.push(`missing expected "${required}"`);
+    if (!found(required)) {
+      failures.push(`missing expected ${required}`);
     }
   }
   for (const forbidden of testCase.mustNotContain) {
-    if (patchedCode.includes(forbidden)) {
-      failures.push(`still contains "${forbidden}"`);
+    if (found(forbidden)) {
+      failures.push(`still contains ${forbidden}`);
     }
   }
 
@@ -34,8 +36,11 @@ async function runCase(testCase: (typeof cases)[number]): Promise<CaseResult> {
 
 async function main() {
   const results: CaseResult[] = [];
+  // `npm run eval -- blik` runs just the cases whose id contains "blik".
+  const only = process.argv[2];
+  const selected = only ? cases.filter((c) => c.id.includes(only)) : cases;
 
-  for (const testCase of cases) {
+  for (const testCase of selected) {
     process.stdout.write(`${testCase.id} ... `);
     try {
       const result = await runCase(testCase);

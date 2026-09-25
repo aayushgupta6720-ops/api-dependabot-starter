@@ -14,3 +14,7 @@ export interface DetectedChange {
 export function changeTarget(change: DetectedChange): string {
   return change.fieldPath ?? change.methodName ?? "";
 }
+
+// How a patch marks code it couldn't fix (something removed with no
+// replacement) for a person to decide on.
+export const REVIEW_MARKER = "TODO(api-dependabot)";

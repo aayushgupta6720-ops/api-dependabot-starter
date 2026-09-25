@@ -124,3 +124,17 @@ test("a field change is scanned for reads of the field, and named after it", asy
   ]);
 });
 
+test("a patch that only flags the code for review isn't titled a fix", async () => {
+  const { deps } = fakes();
+  deps.generatePatch = async (_entry, _file, code) => ({
+    explanation: "Only added a TODO for review: the field was removed with no replacement.",
+    patchedCode: `// TODO(api-dependabot): v1 removed \`x.y\`.\n${code}`,
+  });
+  const titles: string[] = [];
+  deps.openFixPr = async (_branch, _file, _content, title) => {
+    titles.push(title);
+    return "https://github.com/me/repo/pull/9";
+  };
+  await processReleases({ changes: [change], latestTag: "v18.0.0" }, deps, opts);
+  assert.deepEqual(titles, ["Needs review: charges.create", "Needs review: charges.create"]);
+});

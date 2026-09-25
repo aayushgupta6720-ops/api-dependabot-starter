@@ -100,14 +100,26 @@ npm run eval
 
 Replays a fixed set of breaking-change fixtures (`src/eval/fixtures.ts`)
 straight through `generatePatch`, checks the output against each fixture's
-`mustContain`/`mustNotContain` substrings, and writes full results
-(explanations + patched code, not just pass/fail) to `eval-results/`.
+`mustContain`/`mustNotContain` substrings or patterns, and writes full
+results (explanations + patched code, not just pass/fail) to
+`eval-results/`. `npm run eval -- blik` runs only the cases whose id
+contains "blik".
 
-The bundled fixtures are 10 real breaking changes pulled straight from
+The bundled fixtures are 13 real breaking changes pulled straight from
 [stripe-node's own CHANGELOG](https://github.com/stripe/stripe-node/blob/master/CHANGELOG.md)
-(v6.21.0 through v22.0.0), each citing the release it shipped in. If you
-point `TARGET_PACKAGE_REPO` at a different SDK, swap these out for that
-SDK's own history the same way.
+(v6.21.0 through v22.7.0-alpha.4), each citing the release it shipped in:
+10 method changes, a renamed field, a field made optional, and a field
+removed with no replacement. If you point `TARGET_PACKAGE_REPO` at a
+different SDK, swap these out for that SDK's own history the same way.
+
+What a patch does depends on the change. With a replacement (a rename, or
+another way to do the same thing), the code switches to it. A field made
+optional gets its reads guarded. With no replacement, the patch doesn't
+invent one or fake a value: a removed field's read stays (it now gives
+`undefined`) under a `TODO(api-dependabot):` comment, and a removed
+method's call becomes an explicit `throw` with one. Its PR is titled
+"Needs review" rather than "Fix breaking change", since a person has to
+decide what the code should do now.
 
 ## Run logging
 

@@ -1,13 +1,15 @@
 export interface EvalCase {
   id: string;
   changelogEntry: string;
-  methodName: string;
+  methodName?: string; // what the change is about: a method,
+  fieldPath?: string; // or a field read off a returned object
   beforeCode: string;
-  // Substrings the patched code must contain / must no longer contain for
-  // the case to count as a pass. Heuristic, not semantic — good enough to
-  // catch "didn't even try" and "left the old call in place" failures.
-  mustContain: string[];
-  mustNotContain: string[];
+  // What the patched code must contain / must no longer contain for the
+  // case to count as a pass: substrings, or patterns where a correct fix can
+  // be written several ways. Heuristic, not semantic — good enough to catch
+  // "didn't even try" and "left the old call in place" failures.
+  mustContain: (string | RegExp)[];
+  mustNotContain: (string | RegExp)[];
 }
 
 /**
@@ -174,5 +176,63 @@ async function createCheckoutSession(items) {
 `,
     mustContain: ["checkout.sessions.create"],
     mustNotContain: ["checkoutSessions.create"],
+  },
+  // Field changes. A removed field reads as undefined rather than throwing,
+  // so the tempting "fix" is to hard-code the result, which hides the loss.
+  {
+    id: "v22-7-alpha4-blik-mandate-expires-after-removed",
+    changelogEntry:
+      "v22.7.0-alpha.4: `Mandate.payment_method_details.blik.expires_after` removed.",
+    fieldPath: "payment_method_details.blik.expires_after",
+    beforeCode: `import Stripe from "stripe";
+const stripe = new Stripe("sk_test_xxx");
+
+// When a customer's BLIK mandate stops being usable, or null if it doesn't expire.
+async function blikMandateExpiry(mandateId) {
+  const mandate = await stripe.mandates.retrieve(mandateId);
+  const expiresAfter = mandate.payment_method_details.blik.expires_after;
+  return expiresAfter ? new Date(expiresAfter * 1000) : null;
+}
+`,
+    // No replacement exists: flagged for a person, with the read left in
+    // place, not faked. Faking took two forms before the prompt said so: the
+    // first real run's PR hard-coded `return null;`, and an eval run set
+    // `const expiresAfter = null;`.
+    mustContain: ["TODO(api-dependabot)", "22.7.0-alpha.4", /=\s*mandate\.payment_method_details\.blik\.expires_after/],
+    mustNotContain: [/expiresAfter\s*=\s*(null|undefined)\b/, /^\s*return null;\s*$/m],
+  },
+  {
+    id: "v17-billing-alert-usage-threshold-read",
+    changelogEntry:
+      "v17.0.0: Renamed `usage_threshold_config` to `usage_threshold` on `Billing.AlertCreateParams` and `Billing.Alert`.",
+    fieldPath: "usage_threshold_config",
+    beforeCode: `import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+async function alertThreshold(alertId) {
+  const alert = await stripe.billing.alerts.retrieve(alertId);
+  return alert.usage_threshold_config.gte;
+}
+`,
+    // A replacement exists, so switch to it rather than only flag it.
+    mustContain: ["usage_threshold.gte"],
+    mustNotContain: ["usage_threshold_config", "TODO(api-dependabot)"],
+  },
+  {
+    id: "v22-7-alpha4-trial-offer-transition-optional",
+    changelogEntry:
+      "v22.7.0-alpha.4: `ProductCatalog.TrialOffer.end_behavior.transition` changed to be optional.",
+    fieldPath: "end_behavior.transition",
+    beforeCode: `import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+async function priceAfterTrial(offerId) {
+  const offer = await stripe.productCatalog.trialOffers.retrieve(offerId);
+  return offer.end_behavior.transition.price;
+}
+`,
+    // The read is guarded, however it's written: ?., a null check, &&.
+    mustContain: [/transition\s*\?\.|transition\s*[!=]==?\s*(null|undefined)|!\s*[\w.]*transition\b|transition\s*&&/],
+    mustNotContain: [],
   },
 ];

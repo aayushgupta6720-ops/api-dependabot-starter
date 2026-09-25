@@ -1,4 +1,4 @@
-import { changeTarget, type DetectedChange } from "./changes.js";
+import { changeTarget, REVIEW_MARKER, type DetectedChange } from "./changes.js";
 import { config } from "./config.js";
 
 export type { DetectedChange } from "./changes.js";
@@ -115,14 +115,19 @@ function toDetectedChange(item: unknown): DetectedChange[] {
 
 /**
  * Sends the breaking-change diff + the affected code snippet to Gemini,
- * and asks it to return a minimal patch as strict JSON.
+ * and asks it to return a patch as strict JSON. When the SDK removed
+ * something with no replacement, the patch flags the code for a person (a
+ * REVIEW_MARKER comment) instead of faking it: asked only for a minimal fix,
+ * the model hard-coded `return null;` over a removed field's read, which hid
+ * that the code had lost the data. A removed method is different: calling it
+ * throws anyway, so the call becomes an explicit throw rather than staying.
  */
 export async function generatePatch(
   changelogEntry: string,
   affectedFilePath: string,
   affectedCode: string
 ): Promise<PatchResult> {
-  const prompt = `You are fixing code broken by an SDK update.
+  const prompt = `You are updating code for a breaking change in an SDK it uses.
 
 CHANGELOG ENTRY (what changed in the new SDK version):
 ${changelogEntry}
@@ -131,8 +136,16 @@ FILE: ${affectedFilePath}
 CURRENT CODE:
 ${affectedCode}
 
+How to update it:
+- If the change names a replacement (a renamed method, field or parameter, or another way to do the same thing), switch the code to it and keep its behavior.
+- If a field just became optional or nullable, guard each read of it (optional chaining or a null check) and keep the behavior the same when it's present.
+- If a method was removed with no replacement, don't invent one. Calling it now throws an obscure "is not a function" error, so replace the call with a throw of an Error whose message says what was removed and in which version, and put a comment directly above it that starts with "${REVIEW_MARKER}:".
+- If a field was removed with no replacement, don't swap its read for a hard-coded value (such as setting it to null or returning null): the read still runs (it gives undefined), and faking the value hides that the data is gone. Leave the code as it is and add a comment directly above the affected line that starts with "${REVIEW_MARKER}:", names what was removed and in which version, and says what this code can no longer do.
+- Either way, a person will decide what to do about it.
+- Change only what this breaking change requires, and leave the rest of the file exactly as it is.
+
 Return ONLY a JSON object with this exact shape, no markdown fences, no extra text:
-{"explanation": "one sentence on what you changed and why", "patchedCode": "the full corrected file contents"}`;
+{"explanation": "one sentence on what you changed and why; if you only added a TODO for review, say so", "patchedCode": "the full updated file contents"}`;
 
   const cleaned = await callGemini(prompt);
 
