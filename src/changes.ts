@@ -1,0 +1,16 @@
+// What a breaking change is, apart from how it's found or fixed. Kept free
+// of config and API clients, so modules that only need these (and their
+// tests) load without API keys.
+
+export interface DetectedChange {
+  version: string; // release tag the change came from, e.g. "v18.0.0"
+  entry: string; // human-readable changelog line, e.g. "v18.0.0: `charges.create` removed. Use `paymentIntents.create` instead."
+  // Exactly one of these says what to scan for:
+  methodName?: string; // a method callers call, e.g. "charges.create"
+  fieldPath?: string; // a field callers read off a returned object, e.g. "payment_method_details.blik.expires_after"; "[]" marks array elements
+}
+
+/** The method or field a change is about, for logs, branch names and PR titles. */
+export function changeTarget(change: DetectedChange): string {
+  return change.fieldPath ?? change.methodName ?? "";
+}

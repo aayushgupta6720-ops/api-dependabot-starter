@@ -1,5 +1,6 @@
 import path from "node:path";
-import { changeTarget, type DetectedChange, type PatchResult } from "./llmClient.js";
+import { changeTarget, type DetectedChange } from "./changes.js";
+import type { PatchResult } from "./llmClient.js";
 import type { ChangeLogEntry } from "./runLog.js";
 import type { UsageMatch } from "./scanner.js";
 

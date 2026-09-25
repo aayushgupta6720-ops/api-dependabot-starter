@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DetectedChange } from "./llmClient.js";
+import type { DetectedChange } from "./changes.js";
 import { fixBranchName, processReleases, type PipelineDeps } from "./pipeline.js";
 
 const change: DetectedChange = {
@@ -123,3 +123,4 @@ test("a field change is scanned for reads of the field, and named after it", asy
     "api-dependabot/v22.7.0-alpha.4-payment_method_details.blik.expires_after-c.js | Fix breaking change: payment_method_details.blik.expires_after",
   ]);
 });
+
