@@ -27,6 +27,8 @@ cp .env.example .env   # fill in GEMINI_API_KEY, GITHUB_TOKEN, TARGET_REPO
 - `TARGET_REPO` should be a throwaway repo you own, e.g. `yourname/test-repo`,
   containing some sample code that calls the SDK you're tracking.
 - Clone that same repo locally into `./target-repo` (the scanner reads it from disk).
+- `TARGET_PACKAGE` (optional, defaults to `stripe`) is the package name the
+  scanner looks for in `import` statements.
 - `TARGET_PACKAGE_REPO` (optional, defaults to `stripe/stripe-node`) is the GitHub
   repo whose Releases the changelog watcher polls for breaking changes.
 
