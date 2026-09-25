@@ -23,3 +23,38 @@ test("the Gemini API key goes in a header, not the URL", async () => {
   assert.ok(!seen[0].url.includes("test-key-123"));
   assert.equal(seen[0].headers["x-goog-api-key"], "test-key-123");
 });
+
+test("the model's changes become method or field changes; unusable ones are dropped", async () => {
+  const reply = [
+    { version: "v1", entry: "v1: `charges.create` removed.", kind: "method", methodName: "charges.create" },
+    { version: "v1", entry: "v1: `Mandate.x.y` removed.", kind: "field", fieldPath: "x.y", methodName: "mandates.retrieve" },
+    { version: "v1", entry: "no target" },
+    { version: "v1", entry: "field without a path", kind: "field" },
+    "not an object",
+  ];
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }))) as typeof fetch;
+
+  const { extractBreakingChanges } = await import("./llmClient.js");
+  const changes = await extractBreakingChanges("stripe", [{ version: "v1", notes: "..." }]);
+
+  assert.deepEqual(changes, [
+    { version: "v1", entry: "v1: `charges.create` removed.", methodName: "charges.create" },
+    { version: "v1", entry: "v1: `Mandate.x.y` removed.", fieldPath: "x.y" },
+  ]);
+});
+
+test("two entries for the same method in one release become one change", async () => {
+  const reply = [
+    { version: "v1", entry: "v1: `crypto_properties` removed from `financialAddresses.create`.", kind: "method", methodName: "financialAddresses.create" },
+    { version: "v1", entry: "v1: `type` values removed from `financialAddresses.create`.", kind: "method", methodName: "financialAddresses.create" },
+    { version: "v2", entry: "v2: `financialAddresses.create` removed.", kind: "method", methodName: "financialAddresses.create" },
+  ];
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }))) as typeof fetch;
+
+  const { extractBreakingChanges } = await import("./llmClient.js");
+  const changes = await extractBreakingChanges("stripe", [{ version: "v1", notes: "..." }]);
+
+  assert.deepEqual(changes.map((c) => [c.version, c.entry.split("\n").length]), [["v1", 2], ["v2", 1]]);
+});

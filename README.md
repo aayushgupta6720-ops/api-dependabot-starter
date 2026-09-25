@@ -44,6 +44,22 @@ Gemini, then runs scan → generate patch → open PR for each one it finds.
 The scanner groups call sites by file, so a file that calls the changed
 method several times still gets one patch and one PR.
 
+A change is either to a method (`charges.create` removed, or one of its
+parameters) or to a field of an object the SDK returns
+(`Mandate.payment_method_details.blik.expires_after` removed or made
+optional). For a method, the scanner finds calls on a client built from the
+package. For a field, it finds code that reads it: plain or optional
+chaining, `["quoted"]` keys, destructuring, and array elements through
+indexes, `.map`/`.forEach`-style callbacks and `for…of`
+(`classifications[].credit`). With no type information in plain JS, a read
+counts when its path lines up with the end of the field's path over at least
+two names, so `details.blik.expires_after` matches but a bare
+`x.expires_after` doesn't. A one-name field (`livemode`) is only looked for
+in files that import the package, and `*` stands for any one property when
+a field changed under many parents (`country_options.*.igic`). A false
+match costs a model call that finds nothing to change. The scanner skips
+`node_modules`, `.d.ts` files and `dist`/`build` output.
+
 On the very first run there's no "last seen" marker yet, so it only looks at
 the single most recent release — it won't replay the SDK's entire history.
 
@@ -96,7 +112,7 @@ SDK's own history the same way.
 ## Run logging
 
 Every `npm run dev` run appends a JSON entry to `run-log.jsonl` (gitignored,
-created on first run): changes found, call sites found, and a per-file outcome
+created on first run): changes found, call sites or field reads found, and a per-file outcome
 (`pr_opened` / `pr_exists` / `no_change_needed` / `error`; `pr_exists`
 means an earlier run already opened that fix). A failure patching or opening
 a PR for one file is caught and recorded instead of aborting the rest of
@@ -137,7 +153,7 @@ is sent.
 
 | Piece | Status |
 |---|---|
-| Usage scanner (AST-based) | Working — resolves call sites back to a client built from the tracked package, not just text matching, and groups them per file |
+| Usage scanner (AST-based) | Working — resolves call sites back to a client built from the tracked package, finds reads of changed fields, and groups both per file |
 | LLM patch generation (Gemini) | Working |
 | GitHub PR creation | Working |
 | Changelog watcher | Working — polls GitHub Releases, extracts breaking changes via Gemini |

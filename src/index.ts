@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 import { checkForBreakingChanges, markReleasesSeen } from "./changelogWatcher.js";
-import { findUsages } from "./scanner.js";
+import { findFieldUsages, findUsages } from "./scanner.js";
 import { generatePatch } from "./llmClient.js";
 import { findFixPr, openFixPr } from "./githubClient.js";
 import { processReleases } from "./pipeline.js";
@@ -33,7 +33,7 @@ async function main() {
 
     const result = await processReleases(
       releases,
-      { findUsages, generatePatch, findFixPr, openFixPr, markReleasesSeen },
+      { findUsages, findFieldUsages, generatePatch, findFixPr, openFixPr, markReleasesSeen },
       { repoPath: LOCAL_REPO_PATH, targetPackage: config.targetPackage }
     );
     runLog.changes = result.changes;

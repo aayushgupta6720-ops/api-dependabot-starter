@@ -14,7 +14,8 @@ export interface PatchLogEntry {
 export interface ChangeLogEntry {
   version: string;
   entry: string;
-  methodName: string;
+  methodName?: string; // what was scanned for: a method's calls,
+  fieldPath?: string; // or a field's reads
   usagesFound: number;
   patches: PatchLogEntry[];
   error?: string;

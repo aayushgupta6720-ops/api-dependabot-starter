@@ -10,7 +10,14 @@ export interface PatchResult {
 export interface DetectedChange {
   version: string; // release tag the change came from, e.g. "v18.0.0"
   entry: string; // human-readable changelog line, e.g. "v18.0.0: `charges.create` removed. Use `paymentIntents.create` instead."
-  methodName: string; // dotted call path the scanner should look for, e.g. "charges.create"
+  // Exactly one of these says what to scan for:
+  methodName?: string; // a method callers call, e.g. "charges.create"
+  fieldPath?: string; // a field callers read off a returned object, e.g. "payment_method_details.blik.expires_after"; "[]" marks array elements
+}
+
+/** The method or field a change is about, for logs, branch names and PR titles. */
+export function changeTarget(change: DetectedChange): string {
+  return change.fieldPath ?? change.methodName ?? "";
 }
 
 export interface ReleaseNotes {
@@ -61,21 +68,59 @@ export async function extractBreakingChanges(
 RELEASES (oldest to newest):
 ${releasesText}
 
-Identify only changes that would break existing caller code (removed/renamed methods, changed signatures, removed parameters). Ignore additions, deprecations-without-removal, docs, and internal changes.
+Identify only changes that would break existing caller code:
+- methods that were removed or renamed, or whose signature changed
+- request parameters that were removed or renamed, or that lost allowed values. These are "method" changes, named after the method the parameters go to: \`V2.MoneyManagement.FinancialAddressCreateParams\` is v2.moneyManagement.financialAddresses.create, \`...ListParams\` is .list, \`...RetrieveParams\` is .retrieve
+- fields on objects the SDK returns that were removed or renamed, or that became optional or nullable (callers may now read undefined or null)
+Ignore additions (including new enum values), deprecations-without-removal, docs, internal changes, and type changes that don't break reading a field (a field becoming required, a returned enum narrowing).
+Give each method and each field its own entry. When the same field changed under many parents, use one entry with * for the part that varies: \`igic\` removed on \`Tax.Registration.country_options.at\`, \`.be\`, \`.de\`... is country_options.*.igic.
 
-Return ONLY a JSON array, no markdown fences, no extra text. Each element must have this exact shape:
-{"version": "the release tag this change came from, e.g. v18.0.0", "entry": "one-line summary in the form 'v18.0.0: \`old.method\` removed. Use \`new.method\` instead.'", "methodName": "the dotted call path callers would use, e.g. charges.create"}
+Return ONLY a JSON array, no markdown fences, no extra text. Each element is one of these two shapes:
+{"version": "the release tag, e.g. v18.0.0", "entry": "one-line summary, e.g. 'v18.0.0: \`charges.create\` removed. Use \`paymentIntents.create\` instead.'", "kind": "method", "methodName": "the dotted call path callers would use, e.g. charges.create"}
+{"version": "the release tag", "entry": "one-line summary, e.g. 'v22.7.0: \`Mandate.payment_method_details.blik.expires_after\` removed.'", "kind": "field", "fieldPath": "the path callers read off the returned object, without the resource name, e.g. payment_method_details.blik.expires_after; write array elements as [], e.g. classifications[].credit for \`FinancialConnections.Transaction.classifications[]\` credit"}
 
 If there are no breaking changes in any of these releases, return an empty array: []`;
 
   const cleaned = await callGemini(prompt);
 
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(cleaned);
-    return Array.isArray(parsed) ? parsed : [];
+    parsed = JSON.parse(cleaned);
   } catch {
     throw new Error(`Could not parse model output as JSON:\n${cleaned}`);
   }
+  return Array.isArray(parsed) ? mergeSameTarget(parsed.flatMap(toDetectedChange)) : [];
+}
+
+/** Entries for the same method or field in the same release (two parameters
+ * of one method removed, say) become one, so the file gets a single patch
+ * that handles both. Kept apart, they'd share a fix branch, and the second
+ * would be skipped as already having the first one's PR. */
+function mergeSameTarget(changes: DetectedChange[]): DetectedChange[] {
+  const merged = new Map<string, DetectedChange>();
+  for (const change of changes) {
+    const key = JSON.stringify([change.version, change.fieldPath ? "field" : "method", changeTarget(change)]);
+    const earlier = merged.get(key);
+    if (earlier) earlier.entry = `${earlier.entry}\n${change.entry}`;
+    else merged.set(key, { ...change });
+  }
+  return [...merged.values()];
+}
+
+/** One of the model's entries as a DetectedChange, or nothing if it doesn't
+ * say what to scan for (logged, so a dropped change isn't silent). */
+function toDetectedChange(item: unknown): DetectedChange[] {
+  const c = (item ?? {}) as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const version = text(c.version);
+  const entry = text(c.entry);
+  const fieldPath = c.kind === "field" ? text(c.fieldPath) : undefined;
+  const methodName = fieldPath ? undefined : text(c.methodName);
+  if (!version || !entry || (!fieldPath && !methodName)) {
+    console.warn(`Skipping a breaking change the model didn't describe usably: ${JSON.stringify(item)}`);
+    return [];
+  }
+  return [fieldPath ? { version, entry, fieldPath } : { version, entry, methodName }];
 }
 
 /**

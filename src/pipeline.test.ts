@@ -14,9 +14,16 @@ const opts = { repoPath: "/repo", targetPackage: "stripe" };
 function fakes(failFirstPrFor: string[] = []) {
   const prs = new Map<string, string>();
   const failing = new Set(failFirstPrFor);
-  const calls = { generatePatch: [] as string[], markedSeen: [] as string[] };
+  const calls = { generatePatch: [] as string[], markedSeen: [] as string[], scanned: [] as string[] };
   const deps: PipelineDeps = {
-    findUsages: () => ["a.js", "b.js"].map((f) => ({ filePath: `/repo/${f}`, lineNumbers: [5], snippet: `old ${f}` })),
+    findUsages: (_repo, _pkg, methodName) => {
+      calls.scanned.push(`calls to ${methodName}`);
+      return ["a.js", "b.js"].map((f) => ({ filePath: `/repo/${f}`, lineNumbers: [5], snippet: `old ${f}` }));
+    },
+    findFieldUsages: (_repo, _pkg, fieldPath) => {
+      calls.scanned.push(`reads of ${fieldPath}`);
+      return [{ filePath: "/repo/c.js", lineNumbers: [9], snippet: "old c.js" }];
+    },
     generatePatch: async (_entry, file, code) => {
       calls.generatePatch.push(file);
       return { explanation: "fixed", patchedCode: code.replace("old", "new") };
@@ -92,4 +99,27 @@ test("releases whose changelog couldn't be read stay unseen, even with no failed
   );
   assert.equal(result.markedSeen, false);
   assert.deepEqual(calls.markedSeen, []);
+});
+
+test("a field change is scanned for reads of the field, and named after it", async () => {
+  const { deps, calls } = fakes();
+  const field: DetectedChange = {
+    version: "v22.7.0-alpha.4",
+    entry: "v22.7.0-alpha.4: `Mandate.payment_method_details.blik.expires_after` removed.",
+    fieldPath: "payment_method_details.blik.expires_after",
+  };
+  const opened: string[] = [];
+  const openFixPr = deps.openFixPr;
+  deps.openFixPr = async (branch, file, content, title, body) => {
+    opened.push(`${branch} | ${title}`);
+    return openFixPr(branch, file, content, title, body);
+  };
+
+  const result = await processReleases({ changes: [field], latestTag: "v22.7.0-alpha.4" }, deps, opts);
+
+  assert.deepEqual(calls.scanned, ["reads of payment_method_details.blik.expires_after"]);
+  assert.equal(result.changes[0].fieldPath, "payment_method_details.blik.expires_after");
+  assert.deepEqual(opened, [
+    "api-dependabot/v22.7.0-alpha.4-payment_method_details.blik.expires_after-c.js | Fix breaking change: payment_method_details.blik.expires_after",
+  ]);
 });

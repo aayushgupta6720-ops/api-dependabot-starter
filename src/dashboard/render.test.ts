@@ -40,3 +40,10 @@ test("status and eval rows are escaped too, and https PR links still work", () =
   ] }] }]);
   assert.ok(ok.includes('href="https://github.com/me/repo/pull/7"'));
 });
+
+test("a field change says it's a field", () => {
+  const html: string = render.renderRuns([{ ...hostileRun, notesProblems: [], changes: [{
+    version: "v1", fieldPath: "payment_method_details.blik.<b>expires_after</b>", usagesFound: 2, patches: [],
+  }] }]);
+  assert.ok(html.includes("field payment_method_details.blik.&lt;b&gt;expires_after&lt;/b&gt; (2 usages)"));
+});

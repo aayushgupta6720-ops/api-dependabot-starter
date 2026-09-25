@@ -53,7 +53,7 @@ export function renderRuns(runs) {
           <td>
             ${run.changes.map((c) => `
               <div>
-                <strong>${esc(c.version)}</strong> — ${esc(c.methodName)} (${esc(c.usagesFound)} usage${c.usagesFound === 1 ? "" : "s"})
+                <strong>${esc(c.version)}</strong> — ${c.fieldPath ? `field ${esc(c.fieldPath)}` : esc(c.methodName)} (${esc(c.usagesFound)} usage${c.usagesFound === 1 ? "" : "s"})
                 ${c.error ? `<div class="badge badge-error">${esc(c.error)}</div>` : ""}
                 <div>${c.patches.map(badge).join(" ")}</div>
               </div>
