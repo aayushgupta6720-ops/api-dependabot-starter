@@ -1,8 +1,13 @@
 import { Node, Project, SyntaxKind } from "ts-morph";
 
+/**
+ * One entry per affected file, not per call site: the patch generator
+ * rewrites the whole file, so a file with several call sites needs one
+ * patch and one PR, not one per call.
+ */
 export interface UsageMatch {
   filePath: string;
-  lineNumber: number;
+  lineNumbers: number[];
   snippet: string;
 }
 
@@ -71,14 +76,19 @@ export function findUsages(
     }
     if (clientVars.size === 0) continue;
 
+    const lineNumbers: number[] = [];
     for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
       const resolved = resolvePropertyPath(call.getExpression());
       if (!resolved || !clientVars.has(resolved.root)) continue;
       if (resolved.path !== methodName && !resolved.path.endsWith(`.${methodName}`)) continue;
 
+      lineNumbers.push(call.getStartLineNumber());
+    }
+
+    if (lineNumbers.length > 0) {
       matches.push({
         filePath: sourceFile.getFilePath(),
-        lineNumber: call.getStartLineNumber(),
+        lineNumbers,
         snippet: sourceFile.getFullText(),
       });
     }

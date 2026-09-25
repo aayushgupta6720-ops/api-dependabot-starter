@@ -45,14 +45,16 @@ async function main() {
       try {
         console.log(`Scanning ${LOCAL_REPO_PATH} for "${change.methodName}"...`);
         const usages = findUsages(LOCAL_REPO_PATH, config.targetPackage, change.methodName);
-        changeLog.usagesFound = usages.length;
+        changeLog.usagesFound = usages.reduce((n, u) => n + u.lineNumbers.length, 0);
 
         if (usages.length === 0) {
           console.log("No usages found. Nothing to fix.");
           continue;
         }
 
-        console.log(`Found ${usages.length} usage(s). Generating patches...`);
+        console.log(
+          `Found ${changeLog.usagesFound} usage(s) in ${usages.length} file(s). Generating patches...`
+        );
 
         for (const usage of usages) {
           const relativePath = path.relative(path.resolve(LOCAL_REPO_PATH), usage.filePath);
