@@ -123,7 +123,7 @@ export async function processChange(
  * the next run retries them; files that already got a PR are skipped then.
  */
 export async function processReleases(
-  releases: { changes: DetectedChange[]; latestTag: string | null },
+  releases: { changes: DetectedChange[]; latestTag: string | null; notesProblems?: string[] },
   deps: PipelineDeps,
   opts: PipelineOptions
 ): Promise<{ changes: ChangeLogEntry[]; markedSeen: boolean }> {
@@ -133,13 +133,16 @@ export async function processReleases(
     changes.push(await processChange(change, deps, opts));
   }
 
-  const failed = changes.some((c) => c.error || c.patches.some((p) => p.status === "error"));
+  // Unreadable notes count as a failure: their breaking changes may not be in `changes` at all.
+  const failed =
+    (releases.notesProblems?.length ?? 0) > 0 ||
+    changes.some((c) => c.error || c.patches.some((p) => p.status === "error"));
   if (releases.latestTag && !failed) {
     deps.markReleasesSeen(releases.latestTag);
     return { changes, markedSeen: true };
   }
   if (releases.latestTag) {
-    console.log(`Some fixes failed, so releases up to ${releases.latestTag} stay unseen; the next run retries them.`);
+    console.log(`Some notes or fixes failed, so releases up to ${releases.latestTag} stay unseen; the next run retries them.`);
   }
   return { changes, markedSeen: false };
 }

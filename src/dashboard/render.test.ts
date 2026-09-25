@@ -9,6 +9,7 @@ const hostileRun = {
   startedAt: "2026-09-26T00:00:00.000Z",
   changesFound: 1,
   error: "<script>alert('run')</script>",
+  notesProblems: ["v1: link to <iframe src=//evil>"],
   changes: [{
     // the model's reading of a third party's release notes
     version: "v9<img src=x onerror=alert(1)>",
@@ -24,7 +25,7 @@ const hostileRun = {
 
 test("text from release notes and model output is shown, never run", () => {
   const html: string = render.renderRuns([hostileRun]);
-  for (const live of ["<script", "<img", "<svg", "<b ", 'onmouseover="alert(4)', "javascript:"]) {
+  for (const live of ["<script", "<img", "<svg", "<b ", "<iframe", 'onmouseover="alert(4)', "javascript:"]) {
     assert.ok(!html.includes(live), `rendered live markup: ${live}`);
   }
   assert.ok(html.includes("v9&lt;img src=x onerror=alert(1)&gt;")); // still visible, as text

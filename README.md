@@ -47,6 +47,15 @@ method several times still gets one patch and one PR.
 On the very first run there's no "last seen" marker yet, so it only looks at
 the single most recent release — it won't replay the SDK's entire history.
 
+Some releases don't carry their notes: stripe-node's recent ones just say
+"See [the changelog](…/CHANGELOG.md#22-7-0-alpha-5) for the full release
+notes." For a release that short, the watcher reads that release's section
+of the linked changelog instead (found by the link's anchor, or failing that
+by a heading starting with the version) and sends that to the model. It
+only follows links into `TARGET_PACKAGE_REPO` itself. If the section can't
+be read, the run log and dashboard say so and the release stays unseen, so
+its breaking changes aren't silently missed.
+
 The marker only moves once every change from those releases has been
 handled. If a patch or PR fails, the releases stay unseen and the next run
 retries them. Each fix goes on a branch named after its change and file

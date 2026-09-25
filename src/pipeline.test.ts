@@ -82,3 +82,14 @@ test("fix branch names are stable and valid git refs whatever the input", () => 
   assert.match(weird, /^api-dependabot\/[A-Za-z0-9._-]+$/);
   assert.doesNotMatch(weird, /\.\.|[.-]$|\/[.-]/);
 });
+
+test("releases whose changelog couldn't be read stay unseen, even with no failed fixes", async () => {
+  const { deps, calls } = fakes();
+  const result = await processReleases(
+    { changes: [], latestTag: "v22.7.0-alpha.5", notesProblems: ["v22.7.0-alpha.5: couldn't be read"] },
+    deps,
+    opts
+  );
+  assert.equal(result.markedSeen, false);
+  assert.deepEqual(calls.markedSeen, []);
+});

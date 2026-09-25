@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { config } from "./config.js";
 import { extractBreakingChanges, type DetectedChange } from "./llmClient.js";
+import { resolveReleaseNotes } from "./releaseNotes.js";
 
 const octokit = new Octokit({ auth: config.githubToken });
 const [owner, repo] = config.targetPackageRepo.split("/");
@@ -26,6 +27,23 @@ export interface NewReleases {
   // The newest release looked at, to pass to markReleasesSeen once its
   // changes are handled; null when there was nothing new.
   latestTag: string | null;
+  // Releases whose notes are only a link to the changelog, where the linked
+  // section couldn't be read. Their breaking changes may have been missed,
+  // so they shouldn't be marked seen.
+  notesProblems: string[];
+}
+
+/** One file of a GitHub repo at a ref, as text. */
+export async function fetchRepoFile(repoFullName: string, ref: string, filePath: string): Promise<string> {
+  const [fileOwner, fileRepo] = repoFullName.split("/");
+  const { data } = await octokit.repos.getContent({
+    owner: fileOwner,
+    repo: fileRepo,
+    path: filePath,
+    ref,
+    mediaType: { format: "raw" }, // the file itself; the JSON form stops at 1 MB
+  });
+  return data as unknown as string;
 }
 
 /**
@@ -61,12 +79,22 @@ export async function checkForBreakingChanges(): Promise<NewReleases> {
     .filter((r) => r.body)
     .map((r) => ({ version: r.tag_name, notes: r.body! }));
 
-  const found =
-    releasesWithNotes.length > 0
-      ? await extractBreakingChanges(config.targetPackage, releasesWithNotes)
-      : [];
+  // A release whose notes are just "see the changelog" gets its section of it.
+  const { releases: readable, problems } = await resolveReleaseNotes(
+    releasesWithNotes,
+    config.targetPackageRepo,
+    fetchRepoFile
+  );
+  for (const problem of problems) console.warn(problem);
 
-  return { changes: found, latestTag: unseen.length > 0 ? unseen[unseen.length - 1].tag_name : null };
+  const found =
+    readable.length > 0 ? await extractBreakingChanges(config.targetPackage, readable) : [];
+
+  return {
+    changes: found,
+    latestTag: unseen.length > 0 ? unseen[unseen.length - 1].tag_name : null,
+    notesProblems: problems,
+  };
 }
 
 /** Records that releases up to and including `tag` have been fully handled. */

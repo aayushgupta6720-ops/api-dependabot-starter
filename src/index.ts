@@ -25,6 +25,7 @@ async function main() {
     console.log(`Checking ${config.targetPackageRepo} for new breaking changes...`);
     const releases = await checkForBreakingChanges();
     runLog.changesFound = releases.changes.length;
+    if (releases.notesProblems.length > 0) runLog.notesProblems = releases.notesProblems;
 
     if (releases.changes.length === 0) {
       console.log("No new breaking changes found.");

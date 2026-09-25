@@ -27,6 +27,8 @@ export interface RunLogEntry {
   targetPackageRepo: string;
   changesFound: number;
   changes: ChangeLogEntry[];
+  // Releases whose notes only link to a changelog that couldn't be read
+  notesProblems?: string[];
   error?: string;
 }
 

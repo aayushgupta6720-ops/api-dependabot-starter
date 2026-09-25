@@ -47,7 +47,8 @@ export function renderRuns(runs) {
     <tbody>
       ${runs.map((run) => `
         <tr>
-          <td>${esc(fmtTime(run.startedAt))}${run.error ? `<br><span class="badge badge-error">run error: ${esc(run.error)}</span>` : ""}</td>
+          <td>${esc(fmtTime(run.startedAt))}${run.error ? `<br><span class="badge badge-error">run error: ${esc(run.error)}</span>` : ""}${
+            (run.notesProblems ?? []).map((p) => `<br><span class="badge badge-error">unread notes: ${esc(p)}</span>`).join("")}</td>
           <td>${esc(run.changesFound)}</td>
           <td>
             ${run.changes.map((c) => `
