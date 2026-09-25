@@ -4,7 +4,8 @@ const LOG_PATH = "./run-log.jsonl";
 
 export interface PatchLogEntry {
   filePath: string;
-  status: "pr_opened" | "no_change_needed" | "error";
+  // pr_exists: a fix PR for this change and file came from an earlier run (a retry skipped it)
+  status: "pr_opened" | "pr_exists" | "no_change_needed" | "error";
   prUrl?: string;
   explanation?: string;
   error?: string;

@@ -47,6 +47,13 @@ method several times still gets one patch and one PR.
 On the very first run there's no "last seen" marker yet, so it only looks at
 the single most recent release — it won't replay the SDK's entire history.
 
+The marker only moves once every change from those releases has been
+handled. If a patch or PR fails, the releases stay unseen and the next run
+retries them. Each fix goes on a branch named after its change and file
+(`api-dependabot/<version>-<method>-<file>`), so a retry finds the PR an
+earlier run opened and skips that file, without a model call. A PR that was
+closed counts too, so a fix someone rejected isn't reopened.
+
 ## Model and free-tier quota
 
 The model is `gemini-3.5-flash-lite`, set by `MODEL` in `src/llmClient.ts`.
@@ -81,7 +88,8 @@ SDK's own history the same way.
 
 Every `npm run dev` run appends a JSON entry to `run-log.jsonl` (gitignored,
 created on first run): changes found, call sites found, and a per-file outcome
-(`pr_opened` / `no_change_needed` / `error`). A failure patching or opening
+(`pr_opened` / `pr_exists` / `no_change_needed` / `error`; `pr_exists`
+means an earlier run already opened that fix). A failure patching or opening
 a PR for one file is caught and recorded instead of aborting the rest of
 the run — later changes/files in the same run still get processed.
 
@@ -112,7 +120,9 @@ npm test
 ```
 
 Runs offline with Node's built-in test runner (no API keys or network): the
-dashboard's escaping and error handling, and how the Gemini key is sent.
+retry logic in `src/pipeline.ts` (what gets marked seen, what a retry
+skips), the dashboard's escaping and error handling, and how the Gemini key
+is sent.
 
 ## What's stubbed vs. real
 

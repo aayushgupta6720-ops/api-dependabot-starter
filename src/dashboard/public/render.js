@@ -24,6 +24,9 @@ function badge(patch) {
   if (patch.status === "pr_opened") {
     return `<a class="badge badge-ok" href="${safeUrl(patch.prUrl)}" target="_blank" rel="noopener">${file}: PR opened</a>`;
   }
+  if (patch.status === "pr_exists") {
+    return `<a class="badge badge-skip" href="${safeUrl(patch.prUrl)}" target="_blank" rel="noopener">${file}: PR from an earlier run</a>`;
+  }
   if (patch.status === "no_change_needed") {
     return `<span class="badge badge-skip">${file}: no change needed</span>`;
   }

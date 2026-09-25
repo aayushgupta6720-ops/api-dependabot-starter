@@ -21,13 +21,21 @@ function saveState(state: WatcherState) {
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 }
 
+export interface NewReleases {
+  changes: DetectedChange[];
+  // The newest release looked at, to pass to markReleasesSeen once its
+  // changes are handled; null when there was nothing new.
+  latestTag: string | null;
+}
+
 /**
  * Fetches GitHub releases for config.targetPackageRepo published since the
  * last run, and asks the LLM to pull structured breaking changes out of
- * their notes in a single batched call. Advances the on-disk "last seen"
- * marker so re-runs only look at genuinely new releases.
+ * their notes in a single batched call. Doesn't advance the "last seen"
+ * marker itself: the caller does that with markReleasesSeen once every change
+ * has been handled, so a failed patch or PR is retried on the next run.
  */
-export async function checkForBreakingChanges(): Promise<DetectedChange[]> {
+export async function checkForBreakingChanges(): Promise<NewReleases> {
   const state = loadState();
 
   const { data: releases } = await octokit.repos.listReleases({
@@ -58,9 +66,10 @@ export async function checkForBreakingChanges(): Promise<DetectedChange[]> {
       ? await extractBreakingChanges(config.targetPackage, releasesWithNotes)
       : [];
 
-  if (unseen.length > 0) {
-    saveState({ lastSeenTag: unseen[unseen.length - 1].tag_name });
-  }
+  return { changes: found, latestTag: unseen.length > 0 ? unseen[unseen.length - 1].tag_name : null };
+}
 
-  return found;
+/** Records that releases up to and including `tag` have been fully handled. */
+export function markReleasesSeen(tag: string): void {
+  saveState({ lastSeenTag: tag });
 }
