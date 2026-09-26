@@ -15,6 +15,19 @@ export interface PipelineDeps {
   markReleasesSeen(tag: string): void;
 }
 
+/**
+ * `patched` with the same ending and line breaks as `original`: the model
+ * tends to add a blank line at the end, and returns "\n" line breaks for a
+ * "\r\n" file, which would put noise in the diff, or turn it into a rewrite
+ * of every line.
+ */
+export function matchFileEnding(patched: string, original: string): string {
+  let result = patched.replace(/\r\n/g, "\n");
+  if (original.includes("\r\n")) result = result.replace(/\n/g, "\r\n");
+  const ending = original.match(/(\r?\n)*$/)![0];
+  return result.replace(/(\r?\n)*$/, "") + ending;
+}
+
 export interface PipelineOptions {
   repoPath: string; // local checkout of the repo being scanned
   targetPackage: string;
@@ -87,11 +100,9 @@ export async function processChange(
           continue;
         }
 
-        const { explanation, patchedCode } = await deps.generatePatch(
-          change.entry,
-          usage.filePath,
-          usage.snippet
-        );
+        const patch = await deps.generatePatch(change.entry, usage.filePath, usage.snippet);
+        const { explanation } = patch;
+        const patchedCode = matchFileEnding(patch.patchedCode, usage.snippet);
 
         console.log(`${usage.filePath}: ${explanation}`);
 

@@ -119,7 +119,9 @@ invent one or fake a value: a removed field's read stays (it now gives
 `undefined`) under a `TODO(api-dependabot):` comment, and a removed
 method's call becomes an explicit `throw` with one. Its PR is titled
 "Needs review" rather than "Fix breaking change", since a person has to
-decide what the code should do now.
+decide what the code should do now. Either way the patch keeps the file's
+own ending and line breaks, so a model's extra blank line, or "\n" line
+breaks in a "\r\n" file, don't show up in the diff.
 
 ## Run logging
 

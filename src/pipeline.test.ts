@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DetectedChange } from "./changes.js";
-import { fixBranchName, processReleases, type PipelineDeps } from "./pipeline.js";
+import { fixBranchName, matchFileEnding, processReleases, type PipelineDeps } from "./pipeline.js";
 
 const change: DetectedChange = {
   version: "v18.0.0",
@@ -138,3 +138,17 @@ test("a patch that only flags the code for review isn't titled a fix", async () 
   await processReleases({ changes: [change], latestTag: "v18.0.0" }, deps, opts);
   assert.deepEqual(titles, ["Needs review: charges.create", "Needs review: charges.create"]);
 });
+
+test("a patch keeps the file's own ending and line breaks", () => {
+  assert.equal(matchFileEnding("a\nb\n\n\n", "a\n"), "a\nb\n");
+  assert.equal(matchFileEnding("a\nb\n", "a"), "a\nb"); // no final newline stays that way
+  assert.equal(matchFileEnding("a\nb\n", "a\r\nc\r\n"), "a\r\nb\r\n"); // CRLF file: not a whole-file diff
+});
+
+test("a patch that only differs by its ending counts as no change", async () => {
+  const { deps } = fakes();
+  deps.generatePatch = async (_entry, _file, code) => ({ explanation: "nothing to do", patchedCode: `${code}\n\n` });
+  const result = await processReleases({ changes: [change], latestTag: "v18.0.0" }, deps, opts);
+  assert.deepEqual(result.changes[0].patches.map((p) => p.status), ["no_change_needed", "no_change_needed"]);
+});
+
