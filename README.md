@@ -123,6 +123,21 @@ decide what the code should do now. Either way the patch keeps the file's
 own ending and line breaks, so a model's extra blank line, or "\n" line
 breaks in a "\r\n" file, don't show up in the diff.
 
+## Regenerating a PR
+
+```bash
+npm run regenerate -- 7 --dry-run   # show the new patch for PR #7
+npm run regenerate -- 7             # commit it to the PR and update its title and body
+```
+
+A run never revisits a file that already has a fix PR, so a PR opened
+before a prompt change keeps its old patch. `regenerate` redoes one: it
+reads the changelog entry quoted in the PR's body and the file as it is at
+the PR's base commit, asks for a new patch, commits it to the PR's branch,
+and updates the title and body. It only touches open PRs that
+api-dependabot opened and that change one file, and pushes nothing if the
+new patch changes nothing or matches what the PR already has.
+
 ## Run logging
 
 Every `npm run dev` run appends a JSON entry to `run-log.jsonl` (gitignored,

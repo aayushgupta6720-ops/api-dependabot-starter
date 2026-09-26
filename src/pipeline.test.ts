@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DetectedChange } from "./changes.js";
-import { fixBranchName, matchFileEnding, processReleases, type PipelineDeps } from "./pipeline.js";
+import { entryFromPrBody, fixBranchName, fixPrBody, matchFileEnding, processReleases, type PipelineDeps } from "./pipeline.js";
 
 const change: DetectedChange = {
   version: "v18.0.0",
@@ -152,3 +152,9 @@ test("a patch that only differs by its ending counts as no change", async () => 
   assert.deepEqual(result.changes[0].patches.map((p) => p.status), ["no_change_needed", "no_change_needed"]);
 });
 
+test("the entry quoted in a fix PR's body reads back, including merged entries", () => {
+  const entry = "v1: `a` removed.\nv1: `a` parameter `b` removed.";
+  assert.equal(entryFromPrBody(fixPrBody("Did a thing.", entry)), entry);
+  assert.equal(entryFromPrBody(`${fixPrBody("x", "v1: y")}\n\nRegenerated with \`npm run regenerate\`.`), "v1: y");
+  assert.equal(entryFromPrBody("No quote here."), null);
+});
